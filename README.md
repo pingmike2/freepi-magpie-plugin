@@ -41,6 +41,19 @@ or a cloned folder: `{ "plugin": { "freepi": "/absolute/path/to/freepi-magpie-pl
 plugin mints a device session, opens GitHub's own device page, shows the
 code, and finishes on its own. Nothing to paste.
 
+GitHub pre-fills the code on its device page. If the box comes up empty
+(e.g. you had to sign in to GitHub first and landed back on the page),
+just type the code shown in magpie, then press Continue and Authorize.
+
+Accounts are named after the GitHub handle in both sign-in methods — the
+device flow reads it from the API, and pasted tokens are validated
+against `/me` on save, so a bad token is rejected right away.
+
+**Multiple accounts, each with its own proxy**: that is a magpie app
+feature, not plugin code — set a per-account SOCKS5/HTTP proxy in the
+account's settings, and every request this plugin makes for that account
+inherits it automatically (same design as the zcode plugin).
+
 **A terminal (OpenCode)**: `magpie plugin login freepi` and choose the
 same method; or paste a token you minted by hand:
 
