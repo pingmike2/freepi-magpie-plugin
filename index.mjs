@@ -72,6 +72,22 @@ function cleanToken(raw) {
   return text || null
 }
 
+// jwtShape names what is wrong with a pasted token before it is sent, so a
+// mangled paste (a full-width dash, a chat client's ellipsis, a line that
+// lost its tail) reads as a paste problem and not as a bad account.
+function jwtShape(key) {
+  const parts = key.split(".")
+  if (parts.length !== 3) return `That is not a JWT: it has ${parts.length} parts, a token has 3.`
+  const wide = key.match(/[^\x21-\x7e]/)
+  if (wide) {
+    return `That token has a non-ASCII character (${JSON.stringify(wide[0])}) — a dash or quote was mangled on the way. Copy it again straight from the CLI output.`
+  }
+  if (parts[2].length !== 43) {
+    return `That token's signature is ${parts[2].length} characters, a valid one is 43 — part of it was lost. Copy it again straight from the CLI output.`
+  }
+  return null
+}
+
 const modelOf = ([id, name, context, output]) => ({
   id,
   name,
@@ -267,6 +283,10 @@ export const FreePIAuthPlugin = async () => {
             // people paste the whole env line, quotes included — take the JWT out
             const key = cleanToken(raw)
             if (!key) return { type: "failed", error: "Paste the free-pi CLI's JWT (starts with eyJ)." }
+            // a JWT is three base64url segments, the signature 43 chars for
+            // HS256 — say what is wrong instead of letting the API answer 401
+            const shape = jwtShape(key)
+            if (shape) return { type: "failed", error: shape }
             try {
               const me = await fetch(`${ORIGIN}/me`, {
                 headers: { authorization: `Bearer ${key}` },
