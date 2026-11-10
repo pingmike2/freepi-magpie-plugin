@@ -24,7 +24,7 @@
 const PROVIDER = "freepi"
 const BASE = "https://api.freepi.ai/v1"
 const ORIGIN = "https://api.freepi.ai"
-const CLIENT_VERSION = "0.6.15"
+const CLIENT_VERSION = "0.6.16"
 
 // [id, name, context, output] — the catalog GET /client-version lists live;
 // these are the ids it named on 2026-11-10, with the catalog's own usage
