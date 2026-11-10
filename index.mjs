@@ -57,6 +57,21 @@ function tokenOf(auth) {
   return auth?.key ?? auth?.access ?? auth?.refresh ?? null
 }
 
+// cleanToken takes a pasted sign-in apart: the whole env line
+// (FREEPI_TOKEN=eyJ…), surrounding quotes, a "Bearer " prefix and stray
+// whitespace all get stripped so the JWT itself is what reaches the API.
+function cleanToken(raw) {
+  if (!raw) return null
+  let text = String(raw).trim()
+  text = text.split(/\r?\n/).find((line) => line.trim())?.trim() ?? ""
+  text = text.replace(/^export\s+/i, "")
+  text = text.replace(/^[A-Za-z_][A-Za-z0-9_]*\s*=\s*/, "") // FREEPI_TOKEN=
+  text = text.replace(/^Bearer\s+/i, "")
+  text = text.trim().replace(/^['"`]|['"`]$/g, "").trim()
+  text = text.replace(/\s+/g, "")
+  return text || null
+}
+
 const modelOf = ([id, name, context, output]) => ({
   id,
   name,
@@ -248,7 +263,9 @@ export const FreePIAuthPlugin = async () => {
           placeholder: "eyJhbG…",
           // validate on save and name the account after the GitHub handle
           async authorize(inputs, { signal } = {}) {
-            const key = typeof inputs === "string" ? inputs : inputs?.key ?? inputs?.value
+            const raw = typeof inputs === "string" ? inputs : inputs?.key ?? inputs?.value
+            // people paste the whole env line, quotes included — take the JWT out
+            const key = cleanToken(raw)
             if (!key) return { type: "failed", error: "Paste the free-pi CLI's JWT (starts with eyJ)." }
             try {
               const me = await fetch(`${ORIGIN}/me`, {
