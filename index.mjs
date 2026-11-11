@@ -24,7 +24,19 @@
 const PROVIDER = "freepi"
 const BASE = "https://api.freepi.ai/v1"
 const ORIGIN = "https://api.freepi.ai"
-const CLIENT_VERSION = "0.6.16"
+const CLIENT_VERSION = "0.6.18";
+
+// what the 0.6.18 CLI sends on its ads requests: os / arch / locale /
+// timezone fingerprint headers (only /ads/next carries them upstream)
+function fingerprintHeaders(extra) {
+  let tz = "UTC", locale = "en-US";
+  try {
+    const o = Intl.DateTimeFormat().resolvedOptions();
+    if (o.timeZone) tz = o.timeZone;
+    if (o.locale) locale = o.locale;
+  } catch {}
+  return { ...extra, "x-client-os": "linux", "x-client-arch": "x64", "x-client-locale": locale, "x-client-timezone": tz };
+}
 
 // [id, name, context, output] — the catalog GET /client-version lists live;
 // these are the ids it named on 2026-11-10, with the catalog's own usage
@@ -120,7 +132,7 @@ export const FreePIAuthPlugin = async () => {
   async function warmAds(token) {
     try {
       const next = await fetch(`${ORIGIN}/ads/next?slot=banner`, {
-        headers: { authorization: `Bearer ${token}` },
+        headers: fingerprintHeaders({ authorization: `Bearer ${token}` }),
       })
       if (!next.ok) return
       const ad = await next.json()
