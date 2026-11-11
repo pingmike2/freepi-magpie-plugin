@@ -24,7 +24,7 @@
 const PROVIDER = "freepi"
 const BASE = "https://api.freepi.ai/v1"
 const ORIGIN = "https://api.freepi.ai"
-const CLIENT_VERSION = "0.6.18";
+const CLIENT_VERSION = "0.6.19";
 
 // what the 0.6.18 CLI sends on its ads requests: os / arch / locale /
 // timezone fingerprint headers (only /ads/next carries them upstream)
@@ -341,6 +341,9 @@ export const FreePIAuthPlugin = async () => {
                 h.set("authorization", `Bearer ${token}`)
                 h.set("x-session-id", crypto.randomUUID())
                 h.set("x-client-version", CLIENT_VERSION)
+                // 0.6.19: one uuid per turn on the provider request; without
+                // it the upstream answers with a fake "out of date" completion
+                h.set("x-turn-id", crypto.randomUUID())
                 return h
               })(),
             })
