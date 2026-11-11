@@ -129,17 +129,22 @@ export const FreePIAuthPlugin = async () => {
   // each request, exactly like the CLI. A paused account answers 403
   // ads_required until a fresh impression lands, and then stays unpaused
   // for a while (verified 2026-11-10).
-  async function warmAds(token) {
+  async function warmAds(token, sessionId) {
     try {
       const next = await fetch(`${ORIGIN}/ads/next?slot=banner`, {
-        headers: fingerprintHeaders({ authorization: `Bearer ${token}` }),
+        headers: { ...fingerprintHeaders({ authorization: `Bearer ${token}` }), "x-session-id": sessionId },
       })
       if (!next.ok) return
       const ad = await next.json()
       if (!ad?.ad_id || !ad?.click_token) return
+      // the CLI fires the gravity impression pixel before POSTing; the
+      // 0.6.19 gate checks that the session actually loaded the ad
+      if (ad.imp_url?.includes("trygravity.")) {
+        await fetch(ad.imp_url, { method: "GET" }).catch(() => {})
+      }
       await fetch(`${ORIGIN}/ads/impression`, {
         method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "x-session-id": sessionId },
         body: JSON.stringify({ ad_id: ad.ad_id, click_token: ad.click_token, imp_fired: true }),
       })
     } catch {
@@ -325,22 +330,26 @@ export const FreePIAuthPlugin = async () => {
       // own headers, the ads warm-up before the account's first chat, and
       // the session-gate reset-and-retry
       async loader(getAuth) {
-        const auth = await getAuth()
-        const token = tokenOf(auth)
-        if (!token) return {}
-        return {
-          baseURL: BASE,
-          apiKey: token,
-          async fetch(input, init) {
-            await warmAds(token)
-            const request = new Request(input, init)
-            if (request.method !== "POST") return fetch(request)
-            let res = await fetch(request, {
-              headers: (() => {
-                const h = new Headers(request.headers)
-                h.set("authorization", `Bearer ${token}`)
-                h.set("x-session-id", crypto.randomUUID())
-                h.set("x-client-version", CLIENT_VERSION)
+            const auth = await getAuth()
+            const token = tokenOf(auth)
+            if (!token) return {}
+            // one session per loader lifetime, like one CLI session; the ads
+            // gate tracks impressions per session, so ads and chat must share
+            // this id instead of minting a fresh one per request
+            const sessionId = crypto.randomUUID()
+            return {
+              baseURL: BASE,
+              apiKey: token,
+              async fetch(input, init) {
+                await warmAds(token, sessionId)
+                const request = new Request(input, init)
+                if (request.method !== "POST") return fetch(request)
+                let res = await fetch(request, {
+                  headers: (() => {
+                    const h = new Headers(request.headers)
+                    h.set("authorization", `Bearer ${token}`)
+                    h.set("x-session-id", sessionId)
+                    h.set("x-client-version", CLIENT_VERSION)
                 // 0.6.19: one uuid per turn on the provider request; without
                 // it the upstream answers with a fake "out of date" completion
                 h.set("x-turn-id", crypto.randomUUID())
