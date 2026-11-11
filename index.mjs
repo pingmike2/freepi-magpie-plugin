@@ -129,10 +129,10 @@ export const FreePIAuthPlugin = async () => {
   // each request, exactly like the CLI. A paused account answers 403
   // ads_required until a fresh impression lands, and then stays unpaused
   // for a while (verified 2026-11-10).
-  async function warmAds(token, sessionId) {
+  async function warmAds(token, sessionId, turnId) {
     try {
       const next = await fetch(`${ORIGIN}/ads/next?slot=banner`, {
-        headers: { ...fingerprintHeaders({ authorization: `Bearer ${token}` }), "x-session-id": sessionId },
+        headers: { ...fingerprintHeaders({ authorization: `Bearer ${token}` }), "x-session-id": sessionId, "x-turn-id": turnId },
       })
       if (!next.ok) return
       const ad = await next.json()
@@ -341,7 +341,11 @@ export const FreePIAuthPlugin = async () => {
               baseURL: BASE,
               apiKey: token,
               async fetch(input, init) {
-                await warmAds(token, sessionId)
+                // one uuid per request, shared by the ad warm-up and the chat:
+                // the gate keys the impression to the turn id, so a chat whose
+                // turn id differs from its impression still reads as ad-less
+                const turnId = crypto.randomUUID()
+                await warmAds(token, sessionId, turnId)
                 const request = new Request(input, init)
                 if (request.method !== "POST") return fetch(request)
                 let res = await fetch(request, {
@@ -350,9 +354,9 @@ export const FreePIAuthPlugin = async () => {
                     h.set("authorization", `Bearer ${token}`)
                     h.set("x-session-id", sessionId)
                     h.set("x-client-version", CLIENT_VERSION)
-                // 0.6.19: one uuid per turn on the provider request; without
-                // it the upstream answers with a fake "out of date" completion
-                h.set("x-turn-id", crypto.randomUUID())
+                // 0.6.19: one uuid per turn, the same one the impression above
+                // recorded; a fresh uuid here reads as a turn with no ad
+                h.set("x-turn-id", turnId)
                 return h
               })(),
             })
