@@ -24,7 +24,7 @@
 const PROVIDER = "freepi"
 const BASE = "https://api.freepi.ai/v1"
 const ORIGIN = "https://api.freepi.ai"
-const CLIENT_VERSION = "0.6.20";
+const CLIENT_VERSION = "0.6.21";
 
 // what the 0.6.18 CLI sends on its ads requests: os / arch / locale /
 // timezone fingerprint headers (only /ads/next carries them upstream)
